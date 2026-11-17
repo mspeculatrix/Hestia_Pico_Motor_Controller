@@ -48,6 +48,9 @@ from ws_server import WebSocketServer
 LEFT: int = const(0)
 RIGHT: int = const(1)
 
+SERIAL_MSG: int = const(0b01)
+WS_MSG: int = const(0b10)
+
 MOTORCTRL = L298MotorController(
 	Config.MOTOR_L_PWM,
 	Config.MOTOR_L_IN1,
@@ -77,7 +80,7 @@ comm_port: UART = UART(
 
 
 # ==============================================================================
-# SENSORS - if required
+# SENSORS
 # ==============================================================================
 def sensor_isr(pin: Pin) -> None:
 	"""
@@ -104,7 +107,7 @@ sensors: Sensors = Sensors(
 )
 # ----- end of sensor-related block  -------------------------------------------
 
-# ----- If using an OLED display on I2C0 ---------------------------------------
+###   OLED DISPLAY
 oled_i2c = I2C(
 	Config.OLED_I2C_PORT,
 	scl=Config.OLED_I2C_SCL,
@@ -113,9 +116,9 @@ oled_i2c = I2C(
 )
 # Create display instance
 display: SSD1306 = SSD1306(oled_i2c, Config.SSD1306_I2C_ADDR)
-update_display: bool = False
-
-# ----- end of OLED block ------------------------------------------------------
+# Assign certain messages to specific lines
+DISP_CMD_LN: int = const(2)
+DISP_IP_LN: int = const(7)
 
 
 # ==============================================================================
@@ -127,43 +130,44 @@ async def execute_action(
 	"""
 	Repertoire of asynchronous actions using non-blocking sleeps. These provide
 	basic obstacle avoidance.
-
-	This is primarily for use with sensors, so if you're not using sensors you
-	can probably ditch this (and any line that calls it).
-
-	These are just sample actions. Change them to suit how you want your robot
-	to behave. This is where you'll have the most fun coming up with suitable
-	manoeuvre algorithms.
 	"""
+	global display
 
 	prev_direction: int = MOTORCTRL._direction_state
 	prev_speed: int = MOTORCTRL._speed_state
 
+	msg: dict[str, str] = {'type': 'ACT', 'result': 'OK'}
+	action: str = ''
 	# Example decision tree
 	if left and right:
 		# Both triggered: Head-on collision risk
 		await avoidance_manoeuvre('random')
+		action = 'RANDOM'
+		msg['sensors'] = 'L:R'
 
 	elif left:
 		# Only left triggered -> Obstacle on left, veer/turn right
 		await avoidance_manoeuvre('left')
+		action = 'LEFT'
+		msg['sensors'] = 'L'
 
 	elif right:
 		# Only right triggered -> Obstacle on right, veer/turn left
 		await avoidance_manoeuvre('right')
+		action = 'RIGHT'
+		msg['sensors'] = 'R'
 
 	elif analogue:
 		await avoidance_manoeuvre('random')
+		action = 'RANDOM'
+		msg['sensors'] = 'A'
 
 	# Resume previous motion after manoeuvre
 	MOTORCTRL.set_direction(prev_direction)
 	MOTORCTRL.set_speed(prev_speed)
 
-	# We'll probably want a more informative message so that, for example,
-	# a controller SBC/MCU knows what's happening. But, for now...
-	msg: str = f'ACT:L:{left}:R:{right}:A:{analogue}'
-	await ws_svr.broadcast(msg)
-	await send_cli_msg(msg)
+	display.printstr_double(0, 0, action)
+	await send_msg_dict(msg, SERIAL_MSG | WS_MSG)
 
 
 async def avoidance_manoeuvre(dir: str) -> None:
@@ -205,6 +209,20 @@ async def send_cli_msg(msg: str) -> None:
 	"""
 	send_uart_msg(msg)
 	print(f'{msg}')
+
+
+async def send_msg_dict(
+	msgd: dict, format: int, writer: Optional[asyncio.StreamWriter] = None
+) -> None:
+	if format & SERIAL_MSG:
+		for key in msgd:
+			msg: str = f'{key}:{msgd[key]}'
+			await send_cli_msg(msg)
+	if format & WS_MSG:
+		if writer is not None:  # respond to specific WS client
+			await ws_svr.send(writer, json.dumps(msgd))
+		else:
+			await ws_svr.broadcast(msgd)
 
 
 def send_uart_msg(msg: str) -> None:
@@ -280,8 +298,9 @@ async def handle_incoming_message(
 	'type', 'cmd' (which just echoes back the command received) and 'result'.
 	There may be other keys depending on the command.
 	"""
-	global MOTORCTRL
+	global MOTORCTRL, DISP_CMD_LN, display
 	response: dict[str, str | int | float] = {
+		'type': 'CMD',
 		'cmd': cmd_str,  # repeat back to sender
 		'msg': '',
 		'result': 'ERR',  # should be 'OK' or 'ERR'
@@ -300,15 +319,18 @@ async def handle_incoming_message(
 	elif hasattr(Direction, cmd_str):
 		await sensors.action_done.wait()
 		MOTORCTRL.set_direction(getattr(Direction, cmd_str))
+		response['type'] = 'MOT'
 		response['result'] = 'OK'
 	elif cmd_str in MOTORCTRL.speed:
 		await sensors.action_done.wait()
 		MOTORCTRL.set_speed(MOTORCTRL.speed[cmd_str])
+		response['type'] = 'MOT'
 		response['result'] = 'OK'
 
 	# Configuration for use with configuration commands in the format:
 	# CFG:<CFG_NAME>:<NUMBER>
 	elif cmd_str.startswith('CFG:'):
+		response['type'] = 'CFG'
 		cfg: list[str] = cmd_str.split(':')
 		if len(cfg) == 3:
 			if cfg[1] == 'SP_CAL_L':
@@ -332,7 +354,7 @@ async def handle_incoming_message(
 
 	# Other commands
 	elif cmd_str == 'CONFIG':
-		response['type'] = 'CFG'
+		response['type'] = 'CFG_STAT'
 		response['speed'] = MOTORCTRL.speed_state
 		response['base_speed'] = MOTORCTRL.base_speed
 		response['direction'] = Direction.get_dir_name(
@@ -344,26 +366,27 @@ async def handle_incoming_message(
 		response['result'] = 'OK'
 
 	elif cmd_str == 'STATUS':
+		response['type'] = 'STAT'
 		response['clients'] = len(ws_svr.clients)
+		response['result'] = 'OK'
 
 	elif cmd_str == 'IP':
+		response['type'] = 'CFG'
 		response['msg'] = f'{ws_svr.ip}'
 		response['result'] = 'OK'
 
 	else:
+		response['type'] = 'SYS'
 		response['msg'] = 'UNKNOWN_CMD'
 		response['result'] = 'ERR'
 
 	# Decide where to send the response
 	if source in (Config.MSG_SRC_CLI, Config.MSG_SRC_UART):
-		for key in response:
-			msg: str = f'{key}:{response[key]}'
-			await send_cli_msg(msg)
+		await send_msg_dict(response, SERIAL_MSG)
 	elif source == Config.MSG_SRC_WS:
-		if writer is not None:  # respond to specific WS client
-			await ws_svr.send(writer, json.dumps(response))
-		else:
-			await ws_svr.broadcast(response)
+		await send_msg_dict(response, WS_MSG, writer)
+
+	display.println(DISP_CMD_LN, cmd_str)
 
 
 # ==============================================================================
@@ -449,6 +472,11 @@ async def uart_cli_task() -> None:
 		await asyncio.sleep_ms(20)
 
 
+# ==============================================================================
+# MISC. FUNCTIONS
+# ==============================================================================
+
+
 def left_or_right() -> int:
 	return random.getrandbits(1)
 
@@ -461,7 +489,6 @@ async def main() -> None:
 	Initialises hardware peripherals and schedules background tasks concurrently
 	inside the primary uasyncio event loop.
 	"""
-	global update_display
 
 	# Assign message callbacks
 	ws_svr.on_message = handle_incoming_message
@@ -469,7 +496,7 @@ async def main() -> None:
 
 	await send_cli_msg('SYS:RUNNING')
 
-	display.clear()  # If OLED display fitted
+	display.clear()
 	display.show()
 
 	MOTORCTRL.stop()
@@ -485,19 +512,17 @@ async def main() -> None:
 	asyncio.create_task(uart_cli_task())
 	asyncio.create_task(sensor_supervisor())
 
-	display.printstr_double(0, 0, 'Alive!')  # If OLED display fitted
-	display.show()
+	display.printstr_double(0, 0, 'HESTIA')
 
 	ip: str = ''
 
 	while True:
 		if ip != ws_svr.ip:
-			update_display = True
-		if update_display:
 			ip = ws_svr.ip
-			display.println(7, ip)
+			display.println(DISP_IP_LN, ip)
+
+		if display.needs_update:
 			display.show()
-			update_display = False
 		await asyncio.sleep(1)
 
 

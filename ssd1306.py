@@ -117,7 +117,16 @@ class SSD1306:
 		self.i2c: I2C = i2c
 		self.addr: int = addr
 		self.buffer = bytearray(1024)
+		self._needs_update: bool = True
 		self.init_display()
+
+	@property
+	def needs_update(self) -> bool:
+		return self._needs_update
+
+	@needs_update.setter
+	def needs_update(self, condition: bool) -> None:
+		self._needs_update = condition
 
 	def cmd(self, cmd_byte: int) -> None:
 		"""
@@ -166,6 +175,7 @@ class SSD1306:
 		"""
 		for i in range(len(self.buffer)):
 			self.buffer[i] = 0
+		self._needs_update = True
 
 	def clearln(self, line: int) -> None:
 		"""
@@ -176,6 +186,7 @@ class SSD1306:
 		start_idx: int = line * DISP_WIDTH
 		for i in range(start_idx, start_idx + DISP_WIDTH):
 			self.buffer[i] = 0
+		self._needs_update = True
 
 	def draw_pixel(self, x: int, y: int, turn_on: bool) -> None:
 		if x < 0 or x >= DISP_WIDTH or y < 0 or y >= DISP_HEIGHT:
@@ -218,11 +229,17 @@ class SSD1306:
 								pixel_active,
 							)
 			x += (CHAR_WIDTH + 1) * scale
+		self._needs_update = True
 
 	def printstr(self, x: int, y: int, text: str) -> None:
 		self.printstr_scaled(x, y, text, FONT_NORMAL)
 
-	def printstr_double(self, x: int, y: int, text: str) -> None:
+	def printstr_double(
+		self, x: int, y: int, text: str, clear: bool = True
+	) -> None:
+		if clear:
+			self.clearln(y)
+			self.clearln(y + 1)
 		self.printstr_scaled(x, y, text, FONT_DOUBLE)
 
 	def println(self, line: int, text: str) -> None:
@@ -245,3 +262,4 @@ class SSD1306:
 		payload[0] = 0x40
 		payload[1:] = self.buffer
 		self.i2c.writeto(self.addr, payload)
+		self._needs_update = False
