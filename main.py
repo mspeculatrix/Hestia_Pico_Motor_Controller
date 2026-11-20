@@ -61,6 +61,19 @@ MOTORCTRL = L298MotorController(
 	Config.MOTOR_BASE_SPEED,
 )
 
+LED: Pin = Config.LED_PIN
+
+GPIO: list[Pin] = [
+	Pin(8),
+	Pin(9),
+	Pin(10),
+	Pin(11),
+	Pin(12),
+	Pin(13),
+	Pin(14),
+	Pin(15),
+]
+
 # Initialize WebSocket server with credentials and port.
 # We'll assign callback functions later.
 ws_svr = WebSocketServer(
@@ -316,11 +329,15 @@ async def handle_incoming_message(
 		await sensors.action_done.wait()
 		MOTORCTRL.park()
 		response['result'] = 'OK'
+
+	# DIRECTION
 	elif hasattr(Direction, cmd_str):
 		await sensors.action_done.wait()
 		MOTORCTRL.set_direction(getattr(Direction, cmd_str))
 		response['type'] = 'MOT'
 		response['result'] = 'OK'
+
+	# SPEED
 	elif cmd_str in MOTORCTRL.speed:
 		await sensors.action_done.wait()
 		MOTORCTRL.set_speed(MOTORCTRL.speed[cmd_str])
@@ -493,6 +510,12 @@ async def main() -> None:
 	# Assign message callbacks
 	ws_svr.on_message = handle_incoming_message
 	ws_svr.prt_msg = ws_msg_print
+
+	# Set up GPIOs
+	LED.off()
+	# Set GPIOs as inputs with pullups (effectively tristate)
+	for gp in GPIO:
+		gp.init(mode=Pin.IN, pull=Pin.PULL_UP)
 
 	await send_cli_msg('SYS:RUNNING')
 

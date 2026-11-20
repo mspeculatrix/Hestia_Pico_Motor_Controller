@@ -189,6 +189,9 @@ class SSD1306:
 		self._needs_update = True
 
 	def draw_pixel(self, x: int, y: int, turn_on: bool) -> None:
+		"""
+		Set pixel on or off.
+		"""
 		if x < 0 or x >= DISP_WIDTH or y < 0 or y >= DISP_HEIGHT:
 			return
 
@@ -204,6 +207,16 @@ class SSD1306:
 	def printstr_scaled(
 		self, x: int, y: int, text: str, scale: int = FONT_NORMAL
 	) -> None:
+		"""
+		This is the main print function - the others are wrappers to it.
+		The x & y params are character positions, not pixel coordinates.
+		On the 0.96in panel we get:
+			- 21 columns (normal mode), 10 chars (double mode)
+			- 8 lines of text, so y should be 0-7.
+		By default it prints at the normal size (providing 8 lines of text).
+		Using FONT_DOUBLE for the scale param prints double-height/width
+		characters.
+		"""
 		if scale < FONT_NORMAL:
 			scale = FONT_NORMAL
 		if scale > FONT_DOUBLE:
@@ -212,8 +225,11 @@ class SSD1306:
 		for char in text:
 			code: int = ord(char)
 			if code < 0x20 or code > 0x7E:
-				code = ord('?')
+				code = ord('?')  # not a standard ASCII character
 
+			# The index to our table is found by substracting 0x20 from the
+			# character code, as the first printable character in the ASCII
+			# char set has the code 0x20.
 			idx: int = code - 0x20
 			glyph: bytes = FONT_5X7[idx]
 

@@ -31,6 +31,9 @@ class Config:
 	AVOID_REV_TIME: int = 1500
 	AVOID_TURN_TIME: int = 800
 
+	# User LED
+	LED_PIN: Pin = Pin(22, Pin.OUT)
+
 	# Flags used to indicate the source of an incoming message - WebSocket
 	# server, UART or USB-serial CLI.
 	MSG_SRC_WS: int = const(0)
@@ -49,8 +52,8 @@ class Config:
 	ADC2: Pin = Pin(28)
 
 	# Following are for digital sensors - eg, IR proximity sensors - if desired
-	PROX_SENSOR_L: Pin = Pin(22, Pin.IN, Pin.PULL_UP)
-	PROX_SENSOR_R: Pin = Pin(21, Pin.IN, Pin.PULL_UP)
+	PROX_SENSOR_L: Pin = Pin(17, Pin.IN, Pin.PULL_UP)
+	PROX_SENSOR_R: Pin = Pin(16, Pin.IN, Pin.PULL_UP)
 
 	# For OLED panel, if used
 	SSD1306_I2C_ADDR: int = const(0x3C)
