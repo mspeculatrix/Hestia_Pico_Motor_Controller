@@ -41,6 +41,7 @@ def run_ota_boot() -> None:
 
 		if wlan.isconnected():
 			print('OTA:CONNECTED')
+			Config.wlan = wlan  # Hand off active interface
 			import ota
 
 			if ota.check_and_update():
@@ -48,19 +49,24 @@ def run_ota_boot() -> None:
 				time.sleep_ms(200)
 				machine.reset()
 			print('OTA:FIRMWARE_OK')
+			Config.ota_status = 'OK'
 		else:  # if offline, skip OTA and boot normally
 			print(f'OTA:WARNING:UPDATE_SKIPPED:WIFI_STATUS_{wlan.status()}')
 
 	except Exception as e:
 		print(f'OTA:ERR:UPDATE_CHECK_FAILED:{e}')
+		Config.ota_status = 'FAILED'
+		# Keep wlan attached if it is still connected so hestia.py can use it
+		if wlan.isconnected():
+			Config.wlan = wlan
 	finally:
 		# Cleanly tear down radio so hestia.py starts from a known state
-		try:
-			wlan.disconnect()
-			wlan.active(False)
-			time.sleep_ms(500)
-		except Exception as e:
-			print(f'OTA:ERR:DISCONNECT_ISSUE:{e}')
+		# try:
+		# 	wlan.disconnect()
+		# 	wlan.active(False)
+		# 	time.sleep_ms(500)
+		# except Exception as e:
+		# 	print(f'OTA:ERR:DISCONNECT_ISSUE:{e}')
 		gc.collect()
 
 

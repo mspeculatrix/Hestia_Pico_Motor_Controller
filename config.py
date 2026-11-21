@@ -1,5 +1,6 @@
 from machine import Pin
 from micropython import const
+from network import WLAN
 
 # User LED
 LED: Pin = Pin('LED', Pin.OUT)
@@ -10,9 +11,12 @@ class Config:
 	Basic configuration constants and default values.
 	"""
 
-	WIFI_SSID = 'Minerva'  # Your wifi SSID goes here
-	WIFI_PASS = 'CezanneZola'  # Your super-secret wifi password goes here
+	wlan: None | WLAN = None  # Will be populated by main.py
+	WIFI_SSID: str = 'Minerva'  # Your wifi SSID goes here
+	WIFI_PASS: str = 'CezanneZola'  # Your super-secret wifi password goes here
 	MAX_CONN_TRIES: int = const(20)
+
+	ota_status: str = 'NOT_RUN'
 
 	OTA_SERVER_ADDR: str = 'http://10.0.150.10:8100'  # Macbook
 	OTA_DIR: str = 'firmware'

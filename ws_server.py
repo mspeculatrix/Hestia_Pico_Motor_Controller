@@ -10,10 +10,9 @@ import network
 import uasyncio as asyncio
 import ubinascii
 import uhashlib
-from machine import Pin
 from micropython import const
 
-from config import Config
+from config import LED, Config
 
 # ==============================================================================
 # TYPE CHECKING GUARD (Static Analysis vs Embedded Runtime)
@@ -44,6 +43,7 @@ class WebSocketServer:
 			Callable[[str, int, asyncio.StreamWriter], Any]
 		] = None,
 		prt_msg: Optional[Callable[[str], Any]] = None,
+		wlan: Optional[network.WLAN] = None,
 	) -> None:
 		self.port: int = port
 		self.ssid: str = ssid
@@ -54,10 +54,12 @@ class WebSocketServer:
 		self.prt_msg: Callable[[str]] | None = prt_msg
 		self.clients: List[asyncio.StreamWriter] = []
 
-		self._wlan = network.WLAN(network.STA_IF)
-		self._ip: str = ''
-		self._led: Pin = Pin('LED', Pin.OUT)  # Using onboard LED
-		self._led.value(0)
+		self._wlan: network.WLAN = (
+			wlan or Config.wlan or network.WLAN(network.STA_IF)
+		)
+		self._ip: str = (
+			self._wlan.ifconfig()[0] if self._wlan.isconnected() else ''
+		)
 
 	async def start(self) -> None:
 		"""
@@ -70,16 +72,16 @@ class WebSocketServer:
 			connected = await self._connect_wifi()
 			tries += 1
 			if not connected and tries < Config.MAX_CONN_TRIES:
-				self._led(0)
+				LED.off()
 				# short backoff delay to avoid hammering the CYW43 chip
 				await asyncio.sleep(2)
 
 		if not connected:
-			self._led(0)
+			LED.off()
 			self.print_msg('NET:ERR:MAX_RETRIES_EXCEEDED')
 			return
 
-		self._led(1)
+		LED.on()
 		# Start the background wifi health watcher
 		asyncio.create_task(self._monitor_wifi())
 
@@ -109,56 +111,57 @@ class WebSocketServer:
 
 	async def _connect_wifi(self) -> bool:
 		"""
-		Handles initial wifi association with a timeout.
+		        Reuses an existing Wi-Fi association if already connected, otherwise
+		associates with a timeout.
 		"""
 		if not self.ssid:
-			self._led(0)  # ensure off
+			LED.off()  # ensure off
 			return True
 
-		try:
-			# Force clean shutdown of the wireless interface first to clear EPERM states
-			self._wlan.active(False)
-			await asyncio.sleep(1)
+		# Fast-path: reuse connection handed off from main.py
+		if self._wlan.active() and self._wlan.isconnected():
+			self._ip = self._wlan.ifconfig()[0]
+			try:
+				self._wlan.config(pm=0xA11140)
+			except Exception:
+				pass
+			LED.on()
+			self.print_msg(f'NET:REUSED_CONN:IP:{self._ip}')
+			return True
 
-			if not self._wlan.active():
-				self._wlan.active(True)
-				# Give the CYW43 chip a moment to power up its firmware state
+		# If we've got here it's because the above didn't work
+		try:
+			# Let's see if we need to clean up the wifi config before trying again
+			if self._wlan.active():
+				self._wlan.disconnect()
+				self._wlan.active(False)
 				await asyncio.sleep(0.5)
 
-			# Disable CYW43 power-saving sleep to prevent DHCP/association stalls
+			self._wlan.active(True)
+			await asyncio.sleep(0.5)
+
 			try:
 				self._wlan.config(pm=0xA11140)
 			except Exception:
 				pass
 
-			# Ensure clean state before connecting
-			self._wlan.disconnect()
-			await asyncio.sleep_ms(200)
-
-			self._led(1)
+			LED.on()
 			self.print_msg(f'NET:CONNECTING:{self.ssid}')
 			self._wlan.connect(self.ssid, self.password)
+
 		except Exception as e:
 			self.print_msg(f'NET:ERR:INIT_EXCEPTION:{e}')
-			self._led(0)
+			LED.off()
 			return False
 
 		timeout: int = self.CONN_TIMEOUT
-		while timeout > 0:
-			status: int = self._wlan.status()
-			if status == network.STAT_GOT_IP:
-				break
-			if status < 0:
-				# Negative statuses (-1 fail, -2 no AP, -3 wrong password) fail fast
-				self.print_msg(f'NET:ERR:STATUS:{status}')
-				self._led(0)
-				return False
+		while not self._wlan.isconnected() and timeout > 0:
 			await asyncio.sleep(1)
 			timeout -= 1
 
 		if not self._wlan.isconnected():
 			self.print_msg('NET:ERR:CONNECTION_TIMEOUT')
-			self._led(0)
+			LED.off()
 			return False
 
 		self._ip = self._wlan.ifconfig()[0]
@@ -187,10 +190,10 @@ class WebSocketServer:
 						self.print_msg(f'NET:RECONNECTED:IP:{self._ip}')
 					else:
 						self.print_msg('NET:ERR:RECONNECTION_FAILED')
-						self._led(0)
+						LED.off()
 				except Exception as e:
 					self.print_msg(f'NET:ERR:RECONNECT_EXCEPTION:{e}')
-					self._led(0)
+					LED.off()
 
 	def _parse_frame(self, data: bytes) -> Optional[str]:
 		"""
@@ -364,10 +367,9 @@ class WebSocketServer:
 	def _flash_led(
 		self, times: int, delay: int = 250, end_state: int = 0
 	) -> None:
-		if self._led:
-			for _ in range(times):
-				self._led(1)
-				time.sleep_ms(delay)
-				self._led(0)
-				time.sleep_ms(delay)
-			self._led(end_state)
+		for _ in range(times):
+			LED.on()
+			time.sleep_ms(delay)
+			LED.off()
+			time.sleep_ms(delay)
+		LED(end_state)

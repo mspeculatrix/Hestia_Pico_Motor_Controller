@@ -129,6 +129,7 @@ oled_i2c = I2C(
 display: SSD1306 = SSD1306(oled_i2c, Config.SSD1306_I2C_ADDR)
 # Assign certain messages to specific lines
 DISP_CMD_LN: int = const(2)
+DISP_STAT_LN: int = const(4)
 DISP_IP_LN: int = const(7)
 
 
@@ -383,6 +384,7 @@ async def handle_incoming_message(
 	elif cmd_str == 'STATUS':
 		response['type'] = 'STAT'
 		response['clients'] = len(ws_svr.clients)
+		response['ota'] = Config.ota_status
 		response['result'] = 'OK'
 
 	elif cmd_str == 'IP':
@@ -534,6 +536,7 @@ async def main() -> None:
 	asyncio.create_task(sensor_supervisor())
 
 	display.printstr_double(0, 0, 'HESTIA')
+	display.println(DISP_STAT_LN, f'OTA: {Config.ota_status}')
 
 	ip: str = ''
 
