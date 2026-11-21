@@ -34,7 +34,6 @@ if TYPE_CHECKING:
 
 class WebSocketServer:
 	CONN_TIMEOUT: int = const(20)
-	MAX_CONN_TRIES: int = const(20)
 
 	def __init__(
 		self,
@@ -67,10 +66,10 @@ class WebSocketServer:
 		"""
 		connected: bool = False
 		tries: int = 0
-		while not connected and tries < self.MAX_CONN_TRIES:
+		while not connected and tries < Config.MAX_CONN_TRIES:
 			connected = await self._connect_wifi()
 			tries += 1
-			if not connected and tries < self.MAX_CONN_TRIES:
+			if not connected and tries < Config.MAX_CONN_TRIES:
 				self._led(0)
 				# short backoff delay to avoid hammering the CYW43 chip
 				await asyncio.sleep(2)

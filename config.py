@@ -1,6 +1,9 @@
 from machine import Pin
 from micropython import const
 
+# User LED
+LED: Pin = Pin('LED', Pin.OUT)
+
 
 class Config:
 	"""
@@ -9,6 +12,10 @@ class Config:
 
 	WIFI_SSID = 'Minerva'  # Your wifi SSID goes here
 	WIFI_PASS = 'CezanneZola'  # Your super-secret wifi password goes here
+	MAX_CONN_TRIES: int = const(20)
+
+	OTA_SERVER_ADDR: str = 'http://10.0.150.10:8100'  # Macbook
+	OTA_DIR: str = 'firmware'
 
 	# Pin Assignments
 	MOTOR_L_PWM: Pin = Pin(2)
@@ -30,9 +37,6 @@ class Config:
 	# obstacle avoidance manoeuvres.
 	AVOID_REV_TIME: int = 1500
 	AVOID_TURN_TIME: int = 800
-
-	# User LED
-	LED_PIN: Pin = Pin(22, Pin.OUT)
 
 	# Flags used to indicate the source of an incoming message - WebSocket
 	# server, UART or USB-serial CLI.
