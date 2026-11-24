@@ -66,22 +66,23 @@ class WebSocketServer:
 		Connects wifi, starts the background monitor, and launches the
 		server.
 		"""
-		connected: bool = False
-		tries: int = 0
-		while not connected and tries < Config.MAX_CONN_TRIES:
-			connected = await self._connect_wifi()
-			tries += 1
-			if not connected and tries < Config.MAX_CONN_TRIES:
+		if not self.wifi_connected:
+			LED.on()
+			connected: bool = False
+			tries: int = 0
+			while not connected and tries < Config.MAX_CONN_TRIES:
+				connected = await self._connect_wifi()
+				tries += 1
+				if not connected and tries < Config.MAX_CONN_TRIES:
+					LED.off()
+					# short backoff delay to avoid hammering the CYW43 chip
+					await asyncio.sleep(2)
+
+			if not connected:
 				LED.off()
-				# short backoff delay to avoid hammering the CYW43 chip
-				await asyncio.sleep(2)
+				self.print_msg('NET:ERR:MAX_RETRIES_EXCEEDED')
+				return
 
-		if not connected:
-			LED.off()
-			self.print_msg('NET:ERR:MAX_RETRIES_EXCEEDED')
-			return
-
-		LED.on()
 		# Start the background wifi health watcher
 		asyncio.create_task(self._monitor_wifi())
 
@@ -106,17 +107,20 @@ class WebSocketServer:
 		return self._ip
 
 	@property
-	def wifi_connected(self) -> bool | str:
-		return self.ssid and self._wlan.isconnected()
+	def wifi_connected(self) -> bool:
+		"""
+		Returns true if the SSID is set and there is an active wifi connection.
+		"""
+		return True if (self.ssid and self._wlan.isconnected()) else False
 
 	async def _connect_wifi(self) -> bool:
 		"""
-		        Reuses an existing Wi-Fi association if already connected, otherwise
+		Reuses an existing Wi-Fi association if already connected, otherwise
 		associates with a timeout.
 		"""
 		if not self.ssid:
 			LED.off()  # ensure off
-			return True
+			return False
 
 		# Fast-path: reuse connection handed off from main.py
 		if self._wlan.active() and self._wlan.isconnected():

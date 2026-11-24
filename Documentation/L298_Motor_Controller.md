@@ -1,6 +1,6 @@
 # L298 1207 MOTOR CONTROLLER BOARD
 
-Dual-channel motor controller using L298 H-bridge logic control.
+Dual-channel motor controller using L298 H-bridge logic.
 
 Available on [AliExpress](https://fr.aliexpress.com/item/32818921042.html).
 
@@ -49,7 +49,7 @@ MOTOR B
 
 Motor control signal interface logic.
 
-Put simply, `IN1/IN3` & `IN2/IN4` control the direction, '10' means forward, '01' means reverse, '00' is stop.
+Put simply, `IN1/IN2` & `IN3/IN4` control the direction, '10' means forward, '01' means reverse, '00' is stop.
 
 `ENA/ENB` controls the speed with a PWM signal, although full on means full speed.
 

@@ -1,3 +1,12 @@
+"""
+Creates a manifest.json file in the project root directory. This file is
+interrogated by the Pico on boot-up to determine if any files need to be
+updated over-the-air.
+
+We don't normalling invoke this script directly - it's run by the update.sh
+shell script.
+"""
+
 import hashlib
 import json
 import pathlib

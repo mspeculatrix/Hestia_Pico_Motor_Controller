@@ -183,13 +183,18 @@ async def execute_action(
 
 
 async def avoidance_manoeuvre(dir: str) -> None:
+	"""
+	Basic obstacle avoidance manoeuvres. All consist of reversing a short
+	distance and then turning slightly - the direction of turn being
+	determined by which sensors were triggered.
+	"""
 	MOTORCTRL.set_direction(Direction.REV_STR)
 	MOTORCTRL.set_speed(MOTORCTRL.speed['SP_SLOW'])
 	await asyncio.sleep_ms(Config.AVOID_REV_TIME)
 	if dir == 'left':
-		MOTORCTRL.set_direction(Direction.ROTATE_L)
-	elif dir == 'right':
 		MOTORCTRL.set_direction(Direction.ROTATE_R)
+	elif dir == 'right':
+		MOTORCTRL.set_direction(Direction.ROTATE_L)
 	elif dir == 'random':
 		if left_or_right() == LEFT:
 			MOTORCTRL.set_direction(Direction.ROTATE_L)
@@ -226,6 +231,12 @@ async def send_cli_msg(msg: str) -> None:
 async def send_msg_dict(
 	msgd: dict, format: int, writer: Optional[asyncio.StreamWriter] = None
 ) -> None:
+	"""
+	Send a message formatted as a dict. If sent to the serial interfaces, each
+	item in the dict will be sent as a separate message with the format
+	'key:value'. If sent over the WebSocket interface, the dict is turned into
+	a JSON array.
+	"""
 	if format & SERIAL_MSG:
 		for key in msgd:
 			msg: str = f'{key}:{msgd[key]}'

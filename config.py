@@ -2,8 +2,7 @@ from machine import Pin
 from micropython import const
 from network import WLAN
 
-# User LED
-LED: Pin = Pin('LED', Pin.OUT)
+LED: Pin = Pin('LED', Pin.OUT)  # Pico's onboard LED
 
 
 class Config:
@@ -14,7 +13,8 @@ class Config:
 	wlan: None | WLAN = None  # Will be populated by main.py
 	WIFI_SSID: str = 'Minerva'  # Your wifi SSID goes here
 	WIFI_PASS: str = 'CezanneZola'  # Your super-secret wifi password goes here
-	MAX_CONN_TRIES: int = const(20)
+	MAX_CONN_TRIES: int = const(20)  # how many times we'll try to connect
+	WIFI_CONN_WAIT: int = const(15)  # secs we'll wait for wifi to connect
 
 	ota_status: str = 'NOT_RUN'
 

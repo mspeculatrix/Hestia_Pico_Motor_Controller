@@ -1,12 +1,12 @@
 # PICO MOTOR CONTROL
 
-This project is built around a commonly available dual-channel motor controller that uses the L298 dual H-bridge chip. For example, you can find it on [AliExpress](https://fr.aliexpress.com/item/32818921042.html).
+This project is built around a commonly available dual-channel motor controller that uses the same logic as the L298 dual H-bridge chip. You can find it on [AliExpress](https://fr.aliexpress.com/item/32818921042.html).
 
 ![L298 Motor Controller](Reference/L298_Motor_Controller.png)
 
 For more information on this, see the [L298_Motor_Controller.md](Documentation/L298_Motor_Controller.md) file.
 
-We're controlling this with a Raspberry Pi Pico 2W running MicroPython.
+We're controlling this with a Raspberry Pi Pico 2W running MicroPython. The code auto-updates over-the-air, fetching new versions of files from a web server. After editing any Python files, go to the project directory in a terminal and run `./update.sh`.
 
 The project is also geared towards to my Pico Motor Control board.
 
@@ -33,14 +33,11 @@ Information about the sensors I'm using is in the `Reference/Sensors/` folder. B
 
 This is another optional element. On the board, I've broken out the I2C0 port to run an SSD1306 OLED panel. You could use it for other sensors or devices - or nothing. The code sets up the I2C port and imports my basic SSD1306 library - but again, these are optional.
 
-## TO DO
+## REPOSITORIES
 
-- Save config to flash.
-- Collision avoidance routines.
-
-## REPOSITORY
-
-URL: [https://github.com/mspeculatrix/Pico_Motor_Control](https://github.com/mspeculatrix/Pico_Motor_Control)
+- [This project](https://github.com/mspeculatrix/Hestia_Pico_Motor_Controller)
+- [Main Hestia project repo](https://github.com/mspeculatrix/Hestia)
+- [Hestia web server project](https://github.com/mspeculatrix/Hestia_Webserver)
 
 The `main` branch is what I consider to be 'as stable as it gets'. The `dev` branch is always a work in progress.
 
@@ -49,23 +46,3 @@ Directories include:
 - Documentation: My notes, diagrams etc.
 - Hardware: Files relating to my Pico-based PCB for this project. This will contain files needed for fabrication (Gerbers, placement file, BOM), a schematic and any notes I might add.
 - Reference: Datasheets and other documentation for components, modules etc.
-
-## VERSION HISTORY
-
-Dates refer to when the main branch was updated.
-
-### v0.2 - 14 Nov 2026
-
-- Changed wifi connection in WS library so that it makes up to 20 attempts to connect.
-- Changes to obstacle avoidance manoeuvres.
-
-### v0.1 - 12 Nov 2026
-
-Basic working version. Has:
-
-- L298MotorController class.
-- WebSocket server.
-- UART & USB-serial interfaces.
-- Command interpretation.
-- Basic collision avoidance routines catering for 2 digital sensors and up to 3 analogue sensors.
-- OLED screen support.

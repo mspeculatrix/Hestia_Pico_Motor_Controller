@@ -1,4 +1,8 @@
 #!/usr/bin/env zsh
+
+# Run this to create the manifest.json file and upload copies of the project
+# files to the web server.
+
 set -euo pipefail  # Exit immediately on any error or unset variable
 
 SOURCE_DIR="."
@@ -10,8 +14,8 @@ TARGET_KEY="${HOME}/.ssh/ssh-key"
 # Regenerate manifest.json
 python3 update.py
 
-# Extract filenames (JSON keys) from manifest.json into an array
-# and append manifest.json itself to the upload list
+# Extract filenames (JSON keys) from manifest.json into an array to create our
+# upload list and append manifest.json itself to that list
 files=( ${(f)"$(python3 -c 'import json; print("\n".join(json.load(open("manifest.json")).keys()))')"} )
 files+=("manifest.json")
 
